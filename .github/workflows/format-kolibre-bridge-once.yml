@@ -19,6 +19,7 @@ jobs:
         run: uvx --from ruff==0.16.0 ruff --version
       - name: Format only new bridge files
         run: |
+          uvx --from ruff==0.16.0 ruff check --fix src/calibre_mcp/kolibre_bridge tests/unit/test_kolibre_bridge.py
           uvx --from ruff==0.16.0 ruff format src/calibre_mcp/kolibre_bridge tests/unit/test_kolibre_bridge.py
           git diff --exit-code && exit 0
           git config user.name "github-actions[bot]"
