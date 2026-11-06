@@ -72,6 +72,7 @@ external OIDC authorization server that supports **Dynamic Client Registration
 ```env
 KOLIBRE_MCP_OIDC_ISSUER=https://login.example.test/realms/books
 KOLIBRE_MCP_PUBLIC_URL=https://mcp.books.example.test
+KOLIBRE_MCP_OIDC_SCOPES=openid books:read
 ```
 
 With both variables set, FastMCP uses `RemoteAuthProvider` to advertise
@@ -94,6 +95,13 @@ through the native-login/password-confirmed OIDC linking endpoint. Founder
 accounts cannot change someone else's binding through application APIs.
 
 `KOLIBRE_MCP_PUBLIC_URL` is the externally advertised **HTTPS** origin. The
+origin must exclude the `/mcp` path, which FastMCP appends itself.
+`KOLIBRE_MCP_OIDC_SCOPES` is a space-separated list of scopes to advertise
+to MCP OAuth clients (default: `openid`). Configure these consistently with
+the provider's client-registration and resource scope policies. These scopes
+guide OAuth requests; Kolibre's verified identity and live ACLs remain the
+authorization boundary.
+The
 process itself still listens only on loopback; a separately secured TLS proxy
 would be required for remote MCP clients. **Do not enable this remotely with
 personal data yet.** OAuth discovery and real end-to-end MCP client login

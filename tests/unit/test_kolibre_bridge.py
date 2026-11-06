@@ -232,6 +232,20 @@ def test_remote_oidc_configuration_rejects_missing_or_insecure_urls(fake_upstrea
 
 
 @pytest.mark.asyncio
+async def test_oidc_metadata_advertises_configured_scopes(fake_upstream, monkeypatch):
+    client, _, _ = fake_upstream
+    monkeypatch.setenv("KOLIBRE_MCP_OIDC_ISSUER", "https://login.example.test")
+    monkeypatch.setenv("KOLIBRE_MCP_PUBLIC_URL", "https://mcp.example.test")
+    monkeypatch.setenv("KOLIBRE_MCP_OIDC_SCOPES", "openid books:read")
+    app = create_bridge(client).http_app(path="/mcp")
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://mcp.example.test") as http:
+        response = await http.get("/.well-known/oauth-protected-resource/mcp")
+    assert response.status_code == 200
+    assert response.json()["resource"] == "https://mcp.example.test/mcp"
+    assert response.json()["scopes_supported"] == ["openid", "books:read"]
+
+
+@pytest.mark.asyncio
 async def test_only_four_read_only_tools_are_registered(fake_upstream):
     client, _, _ = fake_upstream
     bridge = create_bridge(client)

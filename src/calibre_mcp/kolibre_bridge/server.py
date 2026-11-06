@@ -73,6 +73,10 @@ def _oauth_provider(client: KolibreClient) -> TokenVerifier | RemoteAuthProvider
         token_verifier=verifier,
         authorization_servers=[AnyHttpUrl(issuer)],
         base_url=base_url,
+        # Empty metadata scopes cause MCP clients to register with scope="",
+        # which standards-compliant providers reject. These are requested
+        # OAuth scopes; Kolibre still enforces identity and library permissions.
+        scopes_supported=os.environ.get("KOLIBRE_MCP_OIDC_SCOPES", "openid").split(),
     )
 
 
