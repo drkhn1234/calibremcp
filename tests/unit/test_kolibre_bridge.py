@@ -177,8 +177,15 @@ async def test_missing_and_device_bearers_are_rejected_without_network(fake_upst
     assert calls == []
 
 
-def test_only_four_read_only_tools_are_registered(fake_upstream):
+@pytest.mark.asyncio
+async def test_only_four_read_only_tools_are_registered(fake_upstream):
     client, _, _ = fake_upstream
     bridge = create_bridge(client)
-    assert bridge is not None
     assert isinstance(bridge.auth, KolibreTokenVerifier)
+    tools = await bridge.list_tools()
+    assert {tool.name for tool in tools} == {
+        "kolibre_list_libraries",
+        "kolibre_list_books",
+        "kolibre_search_fulltext",
+        "kolibre_my_annotations",
+    }
