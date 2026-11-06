@@ -9,11 +9,10 @@ from __future__ import annotations
 import os
 from urllib.parse import urlsplit
 
-from pydantic import AnyHttpUrl
-
 from fastmcp import FastMCP
 from fastmcp.server.auth import AccessToken, RemoteAuthProvider, TokenVerifier
 from fastmcp.server.dependencies import get_access_token
+from pydantic import AnyHttpUrl
 
 from .client import KolibreClient, KolibreUnauthorizedError, KolibreUnavailableError
 
@@ -66,14 +65,7 @@ def _oauth_provider(client: KolibreClient) -> TokenVerifier | RemoteAuthProvider
     base_url = os.environ.get("KOLIBRE_MCP_PUBLIC_URL", "").strip().rstrip("/")
     for label, value in (("issuer", issuer), ("MCP public URL", base_url)):
         url = urlsplit(value)
-        if (
-            url.scheme != "https"
-            or not url.hostname
-            or url.username
-            or url.password
-            or url.fragment
-            or url.query
-        ):
+        if url.scheme != "https" or not url.hostname or url.username or url.password or url.fragment or url.query:
             raise ValueError(f"OIDC {label} must be a public HTTPS URL")
     # Cross-origin issuer is expected; the configured Kolibre backend itself
     # validates tokens against that issuer's JWKS and pins the audience.
