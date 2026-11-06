@@ -1,0 +1,28 @@
+name: Format Kolibre bridge once
+on:
+  push:
+    branches:
+      - feature/kolibre-authenticated-mcp-bridge
+    paths:
+      - ".github/workflows/format-kolibre-bridge-once.yml"
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: astral-sh/setup-uv@v5
+      - name: Install Ruff
+        run: uvx --from ruff==0.16.0 ruff --version
+      - name: Format only new bridge files
+        run: |
+          uvx --from ruff==0.16.0 ruff format src/calibre_mcp/kolibre_bridge tests/unit/test_kolibre_bridge.py
+          git diff --exit-code && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/calibre_mcp/kolibre_bridge tests/unit/test_kolibre_bridge.py
+          git commit -m "style: format Kolibre MCP bridge"
+          git push origin HEAD:feature/kolibre-authenticated-mcp-bridge
