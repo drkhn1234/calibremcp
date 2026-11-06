@@ -11,7 +11,7 @@ from fastmcp import FastMCP
 from fastmcp.server.auth import AccessToken, TokenVerifier
 from fastmcp.server.dependencies import get_access_token
 
-from .client import KolibreClient, KolibreUnauthorized, KolibreUnavailable
+from .client import KolibreClient, KolibreUnauthorizedError, KolibreUnavailableError
 
 
 class KolibreTokenVerifier(TokenVerifier):
@@ -29,7 +29,7 @@ class KolibreTokenVerifier(TokenVerifier):
     async def verify_token(self, token: str) -> AccessToken | None:
         try:
             account = await self.client.current_user(token)
-        except (KolibreUnauthorized, KolibreUnavailable):
+        except (KolibreUnauthorizedError, KolibreUnavailableError):
             return None
         return AccessToken(
             token=token,
@@ -43,7 +43,7 @@ def _caller_bearer() -> str:
     """Resolve the *current request's* verified bearer, not a process global."""
     identity = get_access_token()
     if identity is None or not identity.token:
-        raise KolibreUnauthorized("Authenticated Kolibre MCP HTTP session required")
+        raise KolibreUnauthorizedError("Authenticated Kolibre MCP HTTP session required")
     return identity.token
 
 

@@ -8,8 +8,7 @@ import pytest
 
 from calibre_mcp.kolibre_bridge.client import (
     KolibreClient,
-    KolibreUnauthorized,
-    KolibreUnavailable,
+    KolibreUnauthorizedError,
     validate_backend_url,
 )
 from calibre_mcp.kolibre_bridge.server import KolibreTokenVerifier, create_bridge
@@ -103,9 +102,9 @@ async def test_founder_cannot_list_or_search_sisters_private_library(fake_upstre
     accessible = await client.libraries("founder-token")
     assert [x["library"] for x in accessible] == ["shared"]
     assert "path" not in accessible[0]
-    with pytest.raises(KolibreUnauthorized):
+    with pytest.raises(KolibreUnauthorizedError):
         await client.books("founder-token", "private_sister")
-    with pytest.raises(KolibreUnauthorized):
+    with pytest.raises(KolibreUnauthorizedError):
         await client.fulltext("founder-token", "private_sister", "secret")
     assert not any(path.startswith("/api/kolibre/books") for _, path, _ in calls)
     assert not any(path.startswith("/api/kolibre/fulltext") for _, path, _ in calls)
@@ -133,7 +132,7 @@ async def test_revoked_library_is_blocked_immediately(fake_upstream):
     client, _, state = fake_upstream
     assert (await client.books("founder-token", "shared"))[0]["title"] == "Shared physics"
     state["founder_libraries"] = []
-    with pytest.raises(KolibreUnauthorized):
+    with pytest.raises(KolibreUnauthorizedError):
         await client.books("founder-token", "shared")
 
 
@@ -143,7 +142,7 @@ async def test_annotations_are_owner_scoped_and_never_leak_paths(fake_upstream):
     notes = await client.annotations("founder-token")
     assert {note["id"] for note in notes} == {1, 3}
     assert all("local_path" not in note for note in notes)
-    with pytest.raises(KolibreUnauthorized):
+    with pytest.raises(KolibreUnauthorizedError):
         await client.annotations("founder-token", library="private_sister")
     notes = await client.annotations("sister-token", library="private_sister")
     assert [note["text"] for note in notes] == ["sister's private note"]
@@ -172,7 +171,7 @@ def test_remote_cleartext_backend_is_rejected_by_default():
 async def test_missing_and_device_bearers_are_rejected_without_network(fake_upstream):
     client, calls, _ = fake_upstream
     for token in ("", "kolibre_tok_device", "hello\nAuthorization: stolen"):
-        with pytest.raises(KolibreUnauthorized):
+        with pytest.raises(KolibreUnauthorizedError):
             await client.current_user(token)
     assert calls == []
 

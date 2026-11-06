@@ -13,11 +13,11 @@ from urllib.parse import urlsplit
 import httpx
 
 
-class KolibreUnauthorized(Exception):
+class KolibreUnauthorizedError(Exception):
     """Missing, invalid or expired identity (or an inaccessible library)."""
 
 
-class KolibreUnavailable(Exception):
+class KolibreUnavailableError(Exception):
     """Kolibre could not supply a valid, authorized response."""
 
 
@@ -68,7 +68,7 @@ class KolibreClient:
             or "\r" in token
             or "\n" in token
         ):
-            raise KolibreUnauthorized("A Kolibre user bearer token is required")
+            raise KolibreUnauthorizedError("A Kolibre user bearer token is required")
         if not path.startswith("/") or path.startswith("//"):
             raise ValueError("Only predefined absolute Kolibre API paths are allowed")
         try:
@@ -85,16 +85,16 @@ class KolibreClient:
                     headers={"Authorization": f"Bearer {token}"},
                 )
         except httpx.RequestError as exc:
-            raise KolibreUnavailable("Kolibre backend unavailable") from exc
+            raise KolibreUnavailableError("Kolibre backend unavailable") from exc
 
         if response.status_code in (401, 403, 404):
-            raise KolibreUnauthorized("Not authorized for the requested Kolibre resource")
+            raise KolibreUnauthorizedError("Not authorized for the requested Kolibre resource")
         if response.status_code != 200:
-            raise KolibreUnavailable("Kolibre did not return a successful response")
+            raise KolibreUnavailableError("Kolibre did not return a successful response")
         try:
             return response.json()
         except ValueError as exc:
-            raise KolibreUnavailable("Kolibre returned invalid JSON") from exc
+            raise KolibreUnavailableError("Kolibre returned invalid JSON") from exc
 
     async def current_user(self, token: str) -> dict[str, Any]:
         data = await self._get(token, "/api/users/me")
@@ -104,20 +104,20 @@ class KolibreClient:
             or data["id"] <= 0
             or not isinstance(data.get("username"), str)
         ):
-            raise KolibreUnavailable("Invalid Kolibre account response")
+            raise KolibreUnavailableError("Invalid Kolibre account response")
         return {"id": data["id"], "username": data["username"]}
 
     async def libraries(self, token: str) -> list[dict[str, Any]]:
         data = await self._get(token, "/api/kolibre/libraries")
         if not isinstance(data, list):
-            raise KolibreUnavailable("Invalid Kolibre library list")
+            raise KolibreUnavailableError("Invalid Kolibre library list")
         allowed = []
         for item in data:
             if not isinstance(item, dict):
-                raise KolibreUnavailable("Invalid library entry")
+                raise KolibreUnavailableError("Invalid library entry")
             folder = item.get("folder_name")
             if not isinstance(folder, str) or not folder or "/" in folder or "\\" in folder:
-                raise KolibreUnavailable("Invalid library identifier")
+                raise KolibreUnavailableError("Invalid library identifier")
             allowed.append({
                 "library": folder,
                 "name": str(item.get("name") or folder),
@@ -128,12 +128,12 @@ class KolibreClient:
 
     async def require_library(self, token: str, folder: str) -> dict[str, Any]:
         if not isinstance(folder, str) or not folder:
-            raise KolibreUnauthorized("Select an accessible library")
+            raise KolibreUnauthorizedError("Select an accessible library")
         allowed = await self.libraries(token)
         result = next((lib for lib in allowed if lib["library"] == folder), None)
         if result is None:
             # Never disclose whether someone else's private folder exists.
-            raise KolibreUnauthorized("Library not found")
+            raise KolibreUnauthorizedError("Library not found")
         return result
 
     async def books(
@@ -146,7 +146,7 @@ class KolibreClient:
             params={"library": library, "q": query[:200], "limit": limit},
         )
         if not isinstance(data, dict) or not isinstance(data.get("items"), list):
-            raise KolibreUnavailable("Invalid Kolibre catalog response")
+            raise KolibreUnavailableError("Invalid Kolibre catalog response")
         return [
             {
                 "id": item.get("id"),
@@ -171,7 +171,7 @@ class KolibreClient:
             params={"library": library, "q": query[:500], "limit": limit},
         )
         if not isinstance(data, dict) or not isinstance(data.get("results"), list):
-            raise KolibreUnavailable("Invalid Kolibre fulltext response")
+            raise KolibreUnavailableError("Invalid Kolibre fulltext response")
         return [
             {
                 "id": item.get("id"),
@@ -190,10 +190,10 @@ class KolibreClient:
     ) -> list[dict[str, Any]]:
         accessible = {lib["library"] for lib in await self.libraries(token)}
         if library is not None and library not in accessible:
-            raise KolibreUnauthorized("Library not found")
+            raise KolibreUnauthorizedError("Library not found")
         data = await self._get(token, "/api/kolibre/annotations")
         if not isinstance(data, list):
-            raise KolibreUnavailable("Invalid Kolibre annotations response")
+            raise KolibreUnavailableError("Invalid Kolibre annotations response")
         limit = max(1, min(int(limit), 100))
         items = []
         for item in data:
