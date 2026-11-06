@@ -208,6 +208,30 @@ async def test_missing_and_device_bearers_are_rejected_without_network(fake_upst
 
 
 @pytest.mark.asyncio
+def test_oidc_auth_resource_advertises_external_authorization_server(fake_upstream, monkeypatch):
+    from fastmcp.server.auth import RemoteAuthProvider
+
+    client, _, _ = fake_upstream
+    monkeypatch.setenv("KOLIBRE_MCP_OIDC_ISSUER", "https://login.example.test/realms/books")
+    monkeypatch.setenv("KOLIBRE_MCP_PUBLIC_URL", "https://mcp.books.example.test")
+    bridge = create_bridge(client)
+    assert isinstance(bridge.auth, RemoteAuthProvider)
+
+
+def test_remote_oidc_configuration_rejects_missing_or_insecure_urls(fake_upstream, monkeypatch):
+    client, _, _ = fake_upstream
+    monkeypatch.setenv("KOLIBRE_MCP_OIDC_ISSUER", "https://login.example.test/realms/books")
+    for public in ("", "http://mcp.example.test", "https://user:pass@mcp.example.test"):
+        monkeypatch.setenv("KOLIBRE_MCP_PUBLIC_URL", public)
+        with pytest.raises(ValueError):
+            create_bridge(client)
+    monkeypatch.setenv("KOLIBRE_MCP_PUBLIC_URL", "https://mcp.example.test")
+    monkeypatch.setenv("KOLIBRE_MCP_OIDC_ISSUER", "http://not-encrypted.example.test")
+    with pytest.raises(ValueError):
+        create_bridge(client)
+
+
+@pytest.mark.asyncio
 async def test_only_four_read_only_tools_are_registered(fake_upstream):
     client, _, _ = fake_upstream
     bridge = create_bridge(client)
