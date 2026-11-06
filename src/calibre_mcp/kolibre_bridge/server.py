@@ -3,6 +3,7 @@
 No process-global library switching; no direct Calibre filesystem access.
 Only four read-only, permission-aware tools are registered.
 """
+
 from __future__ import annotations
 
 import os
@@ -75,9 +76,7 @@ def create_bridge(client: KolibreClient | None = None) -> FastMCP:
         """
         return {
             "library": library,
-            "books": await client.books(
-                _caller_bearer(), library, query=query, limit=limit
-            ),
+            "books": await client.books(_caller_bearer(), library, query=query, limit=limit),
         }
 
     @mcp.tool()
@@ -89,19 +88,13 @@ def create_bridge(client: KolibreClient | None = None) -> FastMCP:
         """
         return {
             "library": library,
-            "results": await client.fulltext(
-                _caller_bearer(), library, query, limit=limit
-            ),
+            "results": await client.fulltext(_caller_bearer(), library, query, limit=limit),
         }
 
     @mcp.tool()
     async def kolibre_my_annotations(library: str | None = None, limit: int = 50) -> dict:
         """Read the signed-in user's own highlights and notes, not other readers'."""
-        return {
-            "annotations": await client.annotations(
-                _caller_bearer(), library=library, limit=limit
-            )
-        }
+        return {"annotations": await client.annotations(_caller_bearer(), library=library, limit=limit)}
 
     return mcp
 

@@ -4,6 +4,7 @@ Never opens a Calibre metadata.db, accepts raw filesystem paths, or uses
 CalibreMCP's process-global current_library. The caller's bearer is forwarded
 ONLY to the configured Kolibre origin, and Kolibre applies its own ACLs.
 """
+
 from __future__ import annotations
 
 import ipaddress
@@ -52,14 +53,10 @@ class KolibreClient:
         allow_internal_http: bool = False,
         transport: httpx.AsyncBaseTransport | None = None,
     ):
-        self.base_url = validate_backend_url(
-            backend_url, allow_internal_http=allow_internal_http
-        )
+        self.base_url = validate_backend_url(backend_url, allow_internal_http=allow_internal_http)
         self.transport = transport
 
-    async def _get(
-        self, token: str, path: str, params: dict[str, Any] | None = None
-    ) -> Any:
+    async def _get(self, token: str, path: str, params: dict[str, Any] | None = None) -> Any:
         if (
             not token
             or not isinstance(token, str)
@@ -118,12 +115,14 @@ class KolibreClient:
             folder = item.get("folder_name")
             if not isinstance(folder, str) or not folder or "/" in folder or "\\" in folder:
                 raise KolibreUnavailableError("Invalid library identifier")
-            allowed.append({
-                "library": folder,
-                "name": str(item.get("name") or folder),
-                "private": item.get("isPrivate") is True,
-                "can_upload": item.get("canUpload") is True,
-            })
+            allowed.append(
+                {
+                    "library": folder,
+                    "name": str(item.get("name") or folder),
+                    "private": item.get("isPrivate") is True,
+                    "can_upload": item.get("canUpload") is True,
+                }
+            )
         return allowed
 
     async def require_library(self, token: str, folder: str) -> dict[str, Any]:
@@ -136,13 +135,12 @@ class KolibreClient:
             raise KolibreUnauthorizedError("Library not found")
         return result
 
-    async def books(
-        self, token: str, library: str, *, query: str = "", limit: int = 25
-    ) -> list[dict[str, Any]]:
+    async def books(self, token: str, library: str, *, query: str = "", limit: int = 25) -> list[dict[str, Any]]:
         await self.require_library(token, library)
         limit = max(1, min(int(limit), 100))
         data = await self._get(
-            token, "/api/kolibre/books",
+            token,
+            "/api/kolibre/books",
             params={"library": library, "q": query[:200], "limit": limit},
         )
         if not isinstance(data, dict) or not isinstance(data.get("items"), list):
@@ -159,15 +157,14 @@ class KolibreClient:
             if isinstance(item, dict)
         ]
 
-    async def fulltext(
-        self, token: str, library: str, query: str, *, limit: int = 15
-    ) -> list[dict[str, Any]]:
+    async def fulltext(self, token: str, library: str, query: str, *, limit: int = 15) -> list[dict[str, Any]]:
         await self.require_library(token, library)
         if not query.strip():
             return []
         limit = max(1, min(int(limit), 40))
         data = await self._get(
-            token, "/api/kolibre/fulltext/search",
+            token,
+            "/api/kolibre/fulltext/search",
             params={"library": library, "q": query[:500], "limit": limit},
         )
         if not isinstance(data, dict) or not isinstance(data.get("results"), list):
@@ -185,9 +182,7 @@ class KolibreClient:
             if isinstance(item, dict)
         ]
 
-    async def annotations(
-        self, token: str, *, library: str | None = None, limit: int = 50
-    ) -> list[dict[str, Any]]:
+    async def annotations(self, token: str, *, library: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         accessible = {lib["library"] for lib in await self.libraries(token)}
         if library is not None and library not in accessible:
             raise KolibreUnauthorizedError("Library not found")
@@ -206,15 +201,17 @@ class KolibreClient:
                 continue
             if library is not None and folder != library:
                 continue
-            items.append({
-                "id": item.get("id"),
-                "library": folder,
-                "book_id": item.get("calibre_book_id"),
-                "text": item.get("text"),
-                "notes": item.get("notes"),
-                "chapter": item.get("chapter"),
-                "page": item.get("page"),
-            })
+            items.append(
+                {
+                    "id": item.get("id"),
+                    "library": folder,
+                    "book_id": item.get("calibre_book_id"),
+                    "text": item.get("text"),
+                    "notes": item.get("notes"),
+                    "chapter": item.get("chapter"),
+                    "page": item.get("page"),
+                }
+            )
             if len(items) >= limit:
                 break
         return items

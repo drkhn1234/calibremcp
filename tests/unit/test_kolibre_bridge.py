@@ -1,4 +1,5 @@
 """Security regression tests for the isolated, Kolibre-authenticated MCP bridge."""
+
 from __future__ import annotations
 
 import asyncio
@@ -27,51 +28,77 @@ def fake_upstream():
             return httpx.Response(401, json={"detail": "Invalid token"})
 
         if request.url.path == "/api/users/me":
-            return httpx.Response(200, json={
-                "id": 1 if who == "founder-token" else 2,
-                "username": "founder" if who == "founder-token" else "sister",
-                "is_admin": who == "founder-token",
-                "is_founder": who == "founder-token",
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "id": 1 if who == "founder-token" else 2,
+                    "username": "founder" if who == "founder-token" else "sister",
+                    "is_admin": who == "founder-token",
+                    "is_founder": who == "founder-token",
+                },
+            )
 
         if request.url.path == "/api/kolibre/libraries":
-            folders = (
-                state["founder_libraries"]
-                if who == "founder-token"
-                else ["shared", "private_sister"]
+            folders = state["founder_libraries"] if who == "founder-token" else ["shared", "private_sister"]
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "folder_name": folder,
+                        "name": "Private books" if folder.startswith("private_") else "Shared",
+                        "isPrivate": folder.startswith("private_"),
+                        "canUpload": True,
+                        "path": "/secret/server/filesystem/path",  # deliberately not forwarded
+                    }
+                    for folder in folders
+                ],
             )
-            return httpx.Response(200, json=[
-                {
-                    "folder_name": folder,
-                    "name": "Private books" if folder.startswith("private_") else "Shared",
-                    "isPrivate": folder.startswith("private_"),
-                    "canUpload": True,
-                    "path": "/secret/server/filesystem/path",  # deliberately not forwarded
-                }
-                for folder in folders
-            ])
 
         if request.url.path == "/api/kolibre/books":
             folder = request.url.params["library"]
             if folder == "private_sister" and who != "sister-token":
                 return httpx.Response(404)
-            return httpx.Response(200, json={"items": [
-                {"id": 1, "title": "Private notes" if folder == "private_sister" else "Shared physics",
-                 "author": "A", "formats": ["EPUB"], "file_path": "/do/not/expose"},
-            ], "total": 1})
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "title": "Private notes" if folder == "private_sister" else "Shared physics",
+                            "author": "A",
+                            "formats": ["EPUB"],
+                            "file_path": "/do/not/expose",
+                        },
+                    ],
+                    "total": 1,
+                },
+            )
 
         if request.url.path == "/api/kolibre/fulltext/search":
-            return httpx.Response(200, json={"results": [
-                {"id": 1, "title": "Search title", "author": "A",
-                 "format": "EPUB", "snippet_html": "sample passage"}
-            ]})
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "id": 1,
+                            "title": "Search title",
+                            "author": "A",
+                            "format": "EPUB",
+                            "snippet_html": "sample passage",
+                        }
+                    ]
+                },
+            )
 
         if request.url.path == "/api/kolibre/annotations":
-            return httpx.Response(200, json=[
-                {"id": 1, "library": "shared", "text": "own shared note", "local_path": "/secret"},
-                {"id": 2, "library": "private_sister", "text": "sister's private note"},
-                {"id": 3, "library": None, "text": "orphan personal note"},
-            ])
+            return httpx.Response(
+                200,
+                json=[
+                    {"id": 1, "library": "shared", "text": "own shared note", "local_path": "/secret"},
+                    {"id": 2, "library": "private_sister", "text": "sister's private note"},
+                    {"id": 3, "library": None, "text": "orphan personal note"},
+                ],
+            )
 
         raise AssertionError(f"Unexpected Kolibre request: {request.url}")
 
@@ -161,8 +188,12 @@ def test_remote_cleartext_backend_is_rejected_by_default():
         validate_backend_url("http://other-host:8081")
     assert validate_backend_url("https://books.example.com") == "https://books.example.com"
     assert validate_backend_url("http://other-host:8081", allow_internal_http=True) == "http://other-host:8081"
-    for url in ("http://example.com:8081/redirect", "https://user:pass@example.com",
-                "https://example.com?secret=1", "file:///etc/passwd"):
+    for url in (
+        "http://example.com:8081/redirect",
+        "https://user:pass@example.com",
+        "https://example.com?secret=1",
+        "file:///etc/passwd",
+    ):
         with pytest.raises(ValueError):
             validate_backend_url(url)
 
