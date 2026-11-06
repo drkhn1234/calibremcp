@@ -7,9 +7,12 @@ Only four read-only, permission-aware tools are registered.
 from __future__ import annotations
 
 import os
+from urllib.parse import urlsplit
+
+from pydantic import AnyHttpUrl
 
 from fastmcp import FastMCP
-from fastmcp.server.auth import AccessToken, TokenVerifier
+from fastmcp.server.auth import AccessToken, RemoteAuthProvider, TokenVerifier
 from fastmcp.server.dependencies import get_access_token
 
 from .client import KolibreClient, KolibreUnauthorizedError, KolibreUnavailableError
@@ -48,6 +51,39 @@ def _caller_bearer() -> str:
     return identity.token
 
 
+def _oauth_provider(client: KolibreClient) -> TokenVerifier | RemoteAuthProvider:
+    """Use native bearer verification locally, or OAuth discovery via OIDC.
+
+    RemoteAuthProvider delegates browser authorization + PKCE/client
+    registration to the operator's OIDC issuer (which MUST support DCR).
+    Kolibre verifies the issuer's signed JWT access token and explicitly
+    maps its (issuer, subject) to an existing Kolibre user on every call.
+    """
+    verifier = KolibreTokenVerifier(client)
+    issuer = os.environ.get("KOLIBRE_MCP_OIDC_ISSUER", "").strip().rstrip("/")
+    if not issuer:
+        return verifier
+    base_url = os.environ.get("KOLIBRE_MCP_PUBLIC_URL", "").strip().rstrip("/")
+    for label, value in (("issuer", issuer), ("MCP public URL", base_url)):
+        url = urlsplit(value)
+        if (
+            url.scheme != "https"
+            or not url.hostname
+            or url.username
+            or url.password
+            or url.fragment
+            or url.query
+        ):
+            raise ValueError(f"OIDC {label} must be a public HTTPS URL")
+    # Cross-origin issuer is expected; the configured Kolibre backend itself
+    # validates tokens against that issuer's JWKS and pins the audience.
+    return RemoteAuthProvider(
+        token_verifier=verifier,
+        authorization_servers=[AnyHttpUrl(issuer)],
+        base_url=base_url,
+    )
+
+
 def create_bridge(client: KolibreClient | None = None) -> FastMCP:
     if client is None:
         url = os.environ.get("KOLIBRE_BACKEND_URL", "http://127.0.0.1:8081")
@@ -56,7 +92,7 @@ def create_bridge(client: KolibreClient | None = None) -> FastMCP:
 
     mcp = FastMCP(
         name="Kolibre (authenticated read-only bridge)",
-        auth=KolibreTokenVerifier(client),
+        auth=_oauth_provider(client),
     )
 
     @mcp.tool()
