@@ -62,6 +62,47 @@ non-loopback internal hostname needs HTTP; never use this flag for an
 untrusted network. Requests do not follow redirects and do not inherit
 HTTP proxy environment variables.
 
+## Optional OAuth / OIDC discovery (stacked draft)
+
+The default **local-only** bridge still accepts a preissued Kolibre native user
+JWT. For an actual browser-based OAuth Authorization Code + PKCE flow, use an
+external OIDC authorization server that supports **Dynamic Client Registration
+(DCR)**, and configure the following values on the CalibreMCP bridge:
+
+```env
+KOLIBRE_MCP_OIDC_ISSUER=https://login.example.test/realms/books
+KOLIBRE_MCP_PUBLIC_URL=https://mcp.books.example.test
+```
+
+With both variables set, FastMCP uses `RemoteAuthProvider` to advertise
+the trusted external authorization server to remote MCP clients. The IdP
+handles authorization code issuance, PKCE, refresh and client registration.
+The bridge does **not** issue or accept arbitrary unsigned identity claims.
+Every incoming user bearer is checked with Kolibre's
+`GET /api/users/me`; every tool call reuses that same bearer against
+Kolibre's authorized HTTP APIs. This assumes Kolibre's
+`feature/mcp-oidc-identities` branch is deployed in a disposable staging
+environment and configured to verify the IdP's **RS256 JWT access tokens**.
+A normal ID token or opaque access token will not work.
+
+On Kolibre, configure `KOLIBRE_OIDC_ISSUER`,
+`KOLIBRE_OIDC_AUDIENCE`, and `KOLIBRE_OIDC_JWKS_URI`. The issuer must
+match the bridge exactly, and the provider must issue JWT access tokens
+for Kolibre's configured audience. No OIDC identity is auto-provisioned.
+Each Kolibre user must first link their own externally authenticated subject
+through the native-login/password-confirmed OIDC linking endpoint. Founder
+accounts cannot change someone else's binding through application APIs.
+
+`KOLIBRE_MCP_PUBLIC_URL` is the externally advertised **HTTPS** origin. The
+process itself still listens only on loopback; a separately secured TLS proxy
+would be required for remote MCP clients. **Do not enable this remotely with
+personal data yet.** OAuth discovery and real end-to-end MCP client login
+are not verified for a production IdP.
+
+If your IdP does **not** support DCR, FastMCP's OIDC/OAuth proxy approach
+and pre-registered client credentials may be needed instead; this is future
+work, not silently assumed to function.
+
 ## Security properties and limits
 
 1. FastMCP verifies each MCP bearer against the *live* Kolibre
@@ -74,10 +115,10 @@ HTTP proxy environment variables.
    no path selector or direct filesystem access.
 4. Kolibre itself still requires its remaining security audit and staging
    tests. This design does not compensate for a compromised Kolibre API.
-5. FastMCP TokenVerifier accepts an already-issued bearer but does not
-   implement OAuth 2.1 authorization flows or token issuance. Many remote
-   MCP clients (including ChatGPT's connector flow) need a real OAuth/DCR
-   setup before they can log in ergonomically.
+5. Optional RemoteAuthProvider advertises an external OIDC issuer supporting
+   DCR, but production OAuth compatibility and client login are still
+   unverified. No OAuth server or password login pages are provided by the
+   bridge itself.
 6. Fulltext is text search, **not** embedding/semantic RAG; per-user RAG
    storage and retrieval remain a separate milestone.
 7. Root on the VPS can still access private book files. Cryptographic
