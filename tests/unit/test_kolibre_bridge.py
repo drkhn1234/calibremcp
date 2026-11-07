@@ -257,3 +257,10 @@ async def test_only_four_read_only_tools_are_registered(fake_upstream):
         "kolibre_search_fulltext",
         "kolibre_my_annotations",
     }
+    for tool in tools:
+        descriptor = tool.to_mcp_tool()
+        assert descriptor.annotations.readOnlyHint is True
+        assert descriptor.annotations.destructiveHint is False
+        assert descriptor.annotations.idempotentHint is True
+        assert descriptor.annotations.openWorldHint is False
+        assert descriptor.meta["securitySchemes"] == [{"type": "oauth2", "scopes": ["books:read"]}]

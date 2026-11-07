@@ -54,7 +54,8 @@ def _oauth_provider(client: KolibreClient) -> TokenVerifier | RemoteAuthProvider
     """Use native bearer verification locally, or OAuth discovery via OIDC.
 
     RemoteAuthProvider delegates browser authorization + PKCE/client
-    registration to the operator's OIDC issuer (which MUST support DCR).
+    registration to the operator's OIDC issuer. Clients may use a
+    pre-registered client, guarded DCR, or supported metadata documents.
     Kolibre verifies the issuer's signed JWT access token and explicitly
     maps its (issuer, subject) to an existing Kolibre user on every call.
     """
@@ -91,7 +92,19 @@ def create_bridge(client: KolibreClient | None = None) -> FastMCP:
         auth=_oauth_provider(client),
     )
 
-    @mcp.tool()
+    # Descriptive hints for MCP hosts; authentication is enforced separately
+    # on every HTTP request and Kolibre API call. Never expose anonymous tools.
+    tool_metadata = {
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+        "meta": {"securitySchemes": [{"type": "oauth2", "scopes": ["books:read"]}]},
+    }
+
+    @mcp.tool(**tool_metadata)
     async def kolibre_list_libraries() -> dict:
         """List ONLY the logged-in reader's shared and owned private libraries.
 
@@ -100,7 +113,7 @@ def create_bridge(client: KolibreClient | None = None) -> FastMCP:
         """
         return {"libraries": await client.libraries(_caller_bearer())}
 
-    @mcp.tool()
+    @mcp.tool(**tool_metadata)
     async def kolibre_list_books(library: str, query: str = "", limit: int = 25) -> dict:
         """Find books in an authorized Kolibre library; no raw paths or DB IDs.
 
@@ -111,7 +124,7 @@ def create_bridge(client: KolibreClient | None = None) -> FastMCP:
             "books": await client.books(_caller_bearer(), library, query=query, limit=limit),
         }
 
-    @mcp.tool()
+    @mcp.tool(**tool_metadata)
     async def kolibre_search_fulltext(library: str, query: str, limit: int = 15) -> dict:
         """Search indexed passages in ONE authorized library.
 
@@ -123,7 +136,7 @@ def create_bridge(client: KolibreClient | None = None) -> FastMCP:
             "results": await client.fulltext(_caller_bearer(), library, query, limit=limit),
         }
 
-    @mcp.tool()
+    @mcp.tool(**tool_metadata)
     async def kolibre_my_annotations(library: str | None = None, limit: int = 50) -> dict:
         """Read the signed-in user's own highlights and notes, not other readers'."""
         return {"annotations": await client.annotations(_caller_bearer(), library=library, limit=limit)}
