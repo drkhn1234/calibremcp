@@ -1,0 +1,30 @@
+name: Kolibre MCP bridge isolation
+
+on:
+  push:
+    branches:
+      - feature/kolibre-authenticated-mcp-bridge
+  pull_request:
+    paths:
+      - "src/calibre_mcp/kolibre_bridge/**"
+      - "tests/unit/test_kolibre_bridge.py"
+      - "docs/kolibre-multiuser-mcp.md"
+      - ".github/workflows/kolibre-bridge.yml"
+
+jobs:
+  bridge-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CalibreMCP dev dependencies
+        run: uv sync --all-extras
+      - name: Compile bridge
+        run: uv run python -m compileall -q src/calibre_mcp/kolibre_bridge
+      - name: Verify auth, ACL isolation and no path leakage
+        run: uv run python -m pytest tests/unit/test_kolibre_bridge.py -q --no-cov
