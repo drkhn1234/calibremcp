@@ -18,9 +18,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+
 # Absolute, never cwd-relative: Claude Desktop spawns stdio servers with
 # cwd=C:\Windows\System32, where a relative "logs/" is not writable (BUG-063).
-DEFAULT_LOG_FILE = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "calibre-mcp" / "logs" / "calibremcp.log"
+def _default_log_file() -> Path:
+    configured = os.environ.get("CALIBRE_MCP_LOG_FILE", "").strip()
+    if configured:
+        path = Path(configured)
+        if not path.is_absolute():
+            raise ValueError("CALIBRE_MCP_LOG_FILE must be an absolute path")
+        return path
+    return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "calibre-mcp" / "logs" / "calibremcp.log"
+
+
+DEFAULT_LOG_FILE = _default_log_file()
 
 
 def _is_mcp_server() -> bool:

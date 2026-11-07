@@ -47,6 +47,14 @@ export KOLIBRE_BACKEND_URL=http://127.0.0.1:8081
 python -m calibre_mcp.kolibre_bridge
 ```
 
+For a service with a protected or unwritable home, set
+`CALIBRE_MCP_LOG_FILE` to an absolute path in a dedicated writable log
+directory. For example, a systemd service can use
+`/var/log/kolibre-mcp-stage/bridge.jsonl` with its own `LogsDirectory`.
+The home directory and Kolibre book storage need not be writable or accessible
+to the bridge. Without this setting, the existing per-user log path remains
+the default. Relative overrides are rejected.
+
 The listener defaults to `127.0.0.1:10721/mcp`. A non-loopback bind
 is deliberately rejected. This is a separate process and does not replace
 the existing CalibreMCP server.
