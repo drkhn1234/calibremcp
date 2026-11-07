@@ -215,3 +215,33 @@ class KolibreClient:
             if len(items) >= limit:
                 break
         return items
+
+    async def knowledge(
+        self,
+        token: str,
+        *,
+        query: str,
+        library: str | None = None,
+        limit: int = 10,
+        mode: str = "hybrid",
+        include_annotations: bool = True,
+    ) -> dict[str, Any]:
+        accessible = {lib["library"] for lib in await self.libraries(token)}
+        if library is not None and library not in accessible:
+            raise KolibreUnauthorizedError("Library not found")
+        if mode not in {"hybrid", "semantic", "lexical"}:
+            raise ValueError("Invalid retrieval mode")
+        params = {
+            "q": query[:500],
+            "limit": max(1, min(int(limit), 30)),
+            "mode": mode,
+            "include_annotations": str(include_annotations).lower(),
+        }
+        if library is not None:
+            params["library"] = library
+        data = await self._get(token, "/api/kolibre/knowledge/search", params=params)
+        if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+            raise KolibreUnavailableError("Invalid knowledge response")
+        # Backend remains authority; independently suppress foreign library results.
+        data["results"] = [r for r in data["results"] if r.get("library") in accessible]
+        return data
